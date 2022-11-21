@@ -200,10 +200,10 @@ def load_movies_to_database_from_global_df():
                 localization=row["localization"],
             )
             movie.genres.append(random.choice(geners))
-            if index % 4 == 0:
-                movie.genres.append(random.choice(geners))
-            if index % 5 == 0:
-                movie.genres.append(random.choice(geners))
+            # if index % 4 == 0:
+            #     movie.genres.append(random.choice(geners))
+            # if index % 5 == 0:
+            #     movie.genres.append(random.choice(geners))
             db.session.add(movie)
         db.session.commit()
     print("loaded movies to database")
@@ -386,27 +386,23 @@ def setup_database_and_load_small_data():
 # end
 
 def query_1_sqlalchemy():
+    print("################################################################################################################")
     print("Query 1")
     startTime = time.time()
     with app.app_context():
         number_of_seasons = db.session.query(db.func.count(Season.season_number)).filter(Season.series_id == Series.id).label("number_of_seasons")
-        # number_of_seasons = db.session.query(db.func.count(Season.season_number).label("number_of_seasons")).filter(Series.id == Season.series_id).subquery()
-        # series = db.session.query(Series.id).filter(number_of_seasons.c.number_of_seasons > 5).subquery()
-        # seasons = db.session.query(Season.id).filter(Season.series_id.in_(series)).subquery()
-        # episodes = db.session.query(Episode.id).filter(Episode.season_id.in_(seasons)).subquery()
-        # db.session.query(Episode.id).filter(Episode.id.in_(episodes)).update({Episode.genres: [Genre.query.filter_by(name="family").first()]}, synchronize_session=False)
         for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons > 5))))):
-            print(instance.genres)
-            # instance.genres = [Genre.query.filter_by(name="family").first()]
+            instance.geners = []
+            # db.session.commit()
+            instance.genres.append(Genre.query.filter_by(name="family").first())
         for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons < 4))))):
-            print(instance.genres)
-            # instance.genres = [Genre.query.filter_by(name="crime").first()]
+            instance.geners = []
+            # db.session.commit()
+            instance.genres.append(Genre.query.filter_by(name="crime").first())
         for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons > 3).filter(number_of_seasons < 6))))):
-            print(instance.genres)
-            # instance.genres = [Genre.query.filter_by(name="comedy").first()]
-        # for instance in db.session.query(Episode.genres).join(Season).filter(Season.id == Episode.season_id).join(Series).filter(Series.id == Season.series_id).join(number_of_seasons).filter(number_of_seasons.c.number_of_seasons > 5):
-        #     print(instance)
-            # instance.update({Episode.genres: [Genre.query.filter_by(name="family").first()]}, synchronize_session=False)
+            instance.geners = []
+            # db.session.commit()
+            instance.genres.append(Genre.query.filter_by(name="comedy").first())
         db.session.commit()
     execution_time = (time.time() - startTime)
     print("----------------------------------------")
