@@ -179,12 +179,6 @@ def load_data_from_csv():
         columns=['name', 'surname', 'role_name', 'movie_id',],
     )
 
-    print(movies_df)
-    print(series_df)
-    print(seasons_df)
-    print(episodes_df)
-    print(roles_df)
-
     print("loaded data from csv")
 
 
@@ -391,18 +385,29 @@ def setup_database_and_load_small_data():
 # 	 )											  
 # end
 
-def query1():
+def query_1_sqlalchemy():
     print("Query 1")
     startTime = time.time()
     with app.app_context():
         number_of_seasons = db.session.query(db.func.count(Season.season_number)).filter(Season.series_id == Series.id).label("number_of_seasons")
+        # number_of_seasons = db.session.query(db.func.count(Season.season_number).label("number_of_seasons")).filter(Series.id == Season.series_id).subquery()
+        # series = db.session.query(Series.id).filter(number_of_seasons.c.number_of_seasons > 5).subquery()
+        # seasons = db.session.query(Season.id).filter(Season.series_id.in_(series)).subquery()
+        # episodes = db.session.query(Episode.id).filter(Episode.season_id.in_(seasons)).subquery()
+        # db.session.query(Episode.id).filter(Episode.id.in_(episodes)).update({Episode.genres: [Genre.query.filter_by(name="family").first()]}, synchronize_session=False)
         for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons > 5))))):
-            instance.genres = [Genre.query.filter_by(name="family").first()]
+            print(instance.genres)
+            # instance.genres = [Genre.query.filter_by(name="family").first()]
         for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons < 4))))):
-            instance.genres = [Genre.query.filter_by(name="crime").first()]
+            print(instance.genres)
+            # instance.genres = [Genre.query.filter_by(name="crime").first()]
         for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons > 3).filter(number_of_seasons < 6))))):
-            instance.genres = [Genre.query.filter_by(name="comedy").first()]
-    db.session.commit()
+            print(instance.genres)
+            # instance.genres = [Genre.query.filter_by(name="comedy").first()]
+        # for instance in db.session.query(Episode.genres).join(Season).filter(Season.id == Episode.season_id).join(Series).filter(Series.id == Season.series_id).join(number_of_seasons).filter(number_of_seasons.c.number_of_seasons > 5):
+        #     print(instance)
+            # instance.update({Episode.genres: [Genre.query.filter_by(name="family").first()]}, synchronize_session=False)
+        db.session.commit()
     execution_time = (time.time() - startTime)
     print("----------------------------------------")
     print("Execution time: " + str(execution_time))
@@ -427,13 +432,19 @@ def query1():
 # group by genre, public."Movie".localization
 
 
-def query2():
+def query_2_sqlalchemy():
     print("Query 2")
     startTime = time.time()
     with app.app_context():
-        for instance in db.session.query(Movie, Role, Genre).filter(Movie.year > 2015).filter(Role.role_name != "actor").group_by(Genre.name, Movie.localization):
-            print(instance.Genre.name, instance.Movie.localization, db.session.query(db.func.count(Role.movie_id)).filter(Role.movie_id == instance.Movie.id).label("number_of_production_members"))
-    db.session.commit()
+        number_of_production_members = db.func.count(Role.movie_id).label("number_of_production_members")
+        for instance in db.session.query(Genre.name, Movie.localization, number_of_production_members) \
+                .filter(Movie.id == Role.movie_id) \
+                .filter(Movie.year > 2015) \
+                .filter(Role.role_name != "actor") \
+                .join(Genre, Movie.genres) \
+                .group_by(Genre.name, Movie.localization):
+            print(instance)
+        db.session.commit()
     execution_time = (time.time() - startTime)
     print("----------------------------------------")
     print("Execution time: " + str(execution_time))
@@ -455,8 +466,8 @@ load_series_to_database_from_global_df()
 load_seasons_to_database_from_global_df()
 load_episodes_to_database_from_global_df()
 load_roles_to_database_from_global_df()
-query1()
-query2()
+query_1_sqlalchemy()
+# query_2_sqlalchemy()
 
 
 if __name__ == "__main__":
