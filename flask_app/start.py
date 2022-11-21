@@ -8,6 +8,7 @@ from app.database.database import db
 from datetime import datetime
 import pandas as pd
 import random
+import time
 
 class Media(db.Model):
     __tablename__ = "Media"
@@ -344,6 +345,103 @@ def setup_database_and_load_small_data():
 
 
 
+# update public."genre_table" 
+# set genre_id = case
+# when public."genre_table".movie_id in (select public."Movie".id 
+# 										from public."Movie" 
+# 										where public."Movie".season_id 
+# 										in (select public."Season".id 
+# 											from public."Season"
+# 											where public."Season".series_id 
+# 											in (select public."Serie".id 
+# 												from public."Serie"
+# 												where (select count(public."Season".season_number) 
+# 													   as number_of_seasons
+# 													   from public."Season"
+# 													   where public."Season".series_id = public."Serie".id
+# 													  ) > 5
+# 											   )
+# 										   )
+# 									   ) then (select public."Genre".id
+# 											   from public."Genre" 
+# 											   where public."Genre".name = 'family'
+# 											  ) 
+# when public."genre_table".movie_id in (select public."Movie".id 
+# 										from public."Movie" 
+# 										where public."Movie".season_id 
+# 										in (select public."Season".id 
+# 											from public."Season"
+# 											where public."Season".series_id 
+# 											in (select public."Serie".id 
+# 												from public."Serie"
+# 												where (select count(public."Season".season_number) 
+# 													   as number_of_seasons
+# 													   from public."Season"
+# 													   where public."Season".series_id = public."Serie".id
+# 													  ) < 4
+# 											   )
+# 										   )
+# 									   ) then (select public."Genre".id
+# 											   from public."Genre" 
+# 											   where public."Genre".name = 'crime'
+# 											  )										  
+# else (select public."Genre".id
+# 	  from public."Genre" 
+# 	  where public."Genre".name = 'comedy'
+# 	 )											  
+# end
+
+def query1():
+    print("Query 1")
+    startTime = time.time()
+    with app.app_context():
+        number_of_seasons = db.session.query(db.func.count(Season.season_number)).filter(Season.series_id == Series.id).label("number_of_seasons")
+        for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons > 5))))):
+            instance.genres = [Genre.query.filter_by(name="family").first()]
+        for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons < 4))))):
+            instance.genres = [Genre.query.filter_by(name="crime").first()]
+        for instance in db.session.query(Episode).filter(Episode.season_id.in_(db.session.query(Season.id).filter(Season.series_id.in_(db.session.query(Series.id).filter(number_of_seasons > 3).filter(number_of_seasons < 6))))):
+            instance.genres = [Genre.query.filter_by(name="comedy").first()]
+    db.session.commit()
+    execution_time = (time.time() - startTime)
+    print("----------------------------------------")
+    print("Execution time: " + str(execution_time))
+    print("----------------------------------------")
+    print("Query 1 done")
+
+
+# select (select public."Genre".name 
+#             from public."Genre" 
+#             where public."Genre".id 
+#             in (select public."genre_table".genre_id 
+# 	   from public."genre_table" 
+# 	   where public."genre_table".movie_id = public."Movie".id 
+# 	  )
+#            ) as genre,
+#            public."Movie".localization,
+#            count(public."Role".movie_id) as number_of_production_members
+# from public."Movie"
+# join public."Role" 
+# on public."Movie".id = public."Role".movie_id
+# where public."Movie".year > 2015 and public."Role".role_name != 'actor' 
+# group by genre, public."Movie".localization
+
+
+def query2():
+    print("Query 2")
+    startTime = time.time()
+    with app.app_context():
+        for instance in db.session.query(Movie, Role, Genre).filter(Movie.year > 2015).filter(Role.role_name != "actor").group_by(Genre.name, Movie.localization):
+            print(instance.Genre.name, instance.Movie.localization, db.session.query(db.func.count(Role.movie_id)).filter(Role.movie_id == instance.Movie.id).label("number_of_production_members"))
+    db.session.commit()
+    execution_time = (time.time() - startTime)
+    print("----------------------------------------")
+    print("Execution time: " + str(execution_time))
+    print("----------------------------------------")
+    print("Query 2 done")
+
+
+
 app = Flask(__name__, template_folder="app/templates")
 app.config.from_object("app.config.Config")
 app.config["SQLALCHEMY_ECHO"] = True
@@ -357,6 +455,8 @@ load_series_to_database_from_global_df()
 load_seasons_to_database_from_global_df()
 load_episodes_to_database_from_global_df()
 load_roles_to_database_from_global_df()
+query1()
+query2()
 
 
 if __name__ == "__main__":
